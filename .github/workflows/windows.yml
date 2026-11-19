@@ -1,0 +1,43 @@
+name: Build Windows
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Instalar Ninja
+        run: choco install ninja -y
+
+      - name: Baixar Skia pré-compilado
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download -R aseprite/skia -p "Skia-Windows-Release-x64.zip"
+          mkdir skia
+          unzip -q Skia-Windows-Release-x64.zip -d skia
+
+      - name: Configurar e compilar
+        shell: bash
+        run: |
+          mkdir build
+          cd build
+          cmake -G Ninja -DCMAKE_BUILD_TYPE=Release -DLAF_BACKEND=skia \
+            -DSKIA_DIR="$GITHUB_WORKSPACE/skia" \
+            -DSKIA_LIBRARY_DIR="$GITHUB_WORKSPACE/skia/out/Release-x64" \
+            -DSKIA_LIBRARY="$GITHUB_WORKSPACE/skia/out/Release-x64/skia.lib" \
+            ..
+          ninja aseprite
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: aseprite-windows
+          path: build/bin
